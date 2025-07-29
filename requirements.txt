@@ -1,4 +1,4 @@
 gradio
-tensorflow==2.18.0
-pillow
+tensorflow
 numpy
+pillow
