@@ -1,6 +1,11 @@
 services:
   - type: web
-    name: chest-xray-classifier
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    name: chest-xray-app
+    env: docker
+    plan: free
+    region: singapore
+    dockerfilePath: Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8080
