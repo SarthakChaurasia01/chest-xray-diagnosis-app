@@ -1,46 +1,42 @@
-import streamlit as st
+import gradio as gr
+import tensorflow as tf
 import numpy as np
 from PIL import Image
-import tensorflow as tf
+from tensorflow.keras.layers import InputLayer
 
-# Load the model once
-@st.cache_resource
-def load_model():
-    model = tf.keras.models.load_model("Chest-X-Ray Classification Model (1).h5")
-    return model
+# Custom InputLayer to handle batch_shape
+class CustomInputLayer(InputLayer):
+    @classmethod
+    def from_config(cls, config):
+        if "batch_shape" in config:
+            config["batch_input_shape"] = config.pop("batch_shape")  # Convert to compatible key
+        return cls(**config)
 
-model = load_model()
+# Load the model with custom objects
+model = tf.keras.models.load_model("model.h5", custom_objects={"InputLayer": CustomInputLayer})
 
-# Class names (edit if your model uses different labels)
-CLASS_NAMES = ['Normal', 'Pneumonia', 'COVID-19']
+# Preprocess function
+def preprocess(image):
+    image = image.resize((224, 224))
+    image = np.array(image) / 255.0
+    image = np.expand_dims(image, axis=0)
+    return image
 
-st.set_page_config(page_title="Chest X-Ray Classifier", layout="centered")
-st.title("🔬 Chest X-Ray Classification")
-st.write("Upload a chest X-ray image and the model will predict if it's Normal, Pneumonia, or COVID-19.")
+# Prediction function
+def predict(image):
+    image = preprocess(image)
+    predictions = model.predict(image)[0]
+    classes = ["Normal", "COVID-19", "Pneumonia"]
+    results = {cls: float(predictions[i]) for i, cls in enumerate(classes)}
+    return results
 
-# File uploader
-uploaded_file = st.file_uploader("Choose a chest X-ray image", type=["jpg", "jpeg", "png"])
+# Create interface
+demo = gr.Interface(
+    fn=predict,
+    inputs=gr.Image(type="pil"),
+    outputs=gr.Label(num_top_classes=3),
+    title="Chest X-Ray Classifier",
+    description="Upload a chest X-ray image. The model will classify it as Normal, COVID-19, or Pneumonia."
+)
 
-if uploaded_file:
-    # Load and display image
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Chest X-ray", use_column_width=True)
-
-    # Preprocess
-    img_resized = image.resize((224, 224))
-    img_array = np.array(img_resized) / 255.0
-    img_batch = np.expand_dims(img_array, axis=0)
-
-    # Predict
-    prediction = model.predict(img_batch)[0]
-    predicted_class = CLASS_NAMES[np.argmax(prediction)]
-    confidence = np.max(prediction) * 100
-
-    # Output
-    st.markdown(f"### 🧠 Prediction: `{predicted_class}`")
-    st.markdown(f"Confidence: **{confidence:.2f}%**")
-
-    # Optional: Show raw scores
-    st.subheader("Prediction Scores:")
-    for i, score in enumerate(prediction):
-        st.write(f"{CLASS_NAMES[i]}: {score:.4f}")
+demo.launch()
