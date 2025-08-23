@@ -14,14 +14,18 @@ def load_model():
     hidden_units = 10   # 👈 your training value
 
     model = ChestXRayClassifier(input_shape, output_shape, hidden_units)
-    model.load_state_dict(torch.load("model_3.pth", map_location=torch.device("cpu")))
+
+    # Safe load: works even if trained on GPU
+    state_dict = torch.load("model_3.pth", map_location=torch.device("cpu"))
+    model.load_state_dict(state_dict)
+
     model.eval()
     return model
 
 model = load_model()
 
 # ----------------------------
-# Transforms (same as training)
+# Transforms
 # ----------------------------
 data_transform = transforms.Compose([
     transforms.Resize((224, 224)),
