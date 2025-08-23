@@ -1,72 +1,64 @@
 import streamlit as st
 import torch
-import torch.nn as nn
 from torchvision import transforms
 from PIL import Image
+from utils.model import ChestXRayClassifier
 
-# -------------------
-# Load Model
-# -------------------
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ----------------------------
+# Load model
+# ----------------------------
+@st.cache_resource
+def load_model():
+    input_shape = 3
+    output_shape = 3
+    hidden_units = 10   # 👈 your training value
 
-# Define the model architecture (must match training)
-# Example: simple CNN, replace with your architecture
-class SimpleCNN(nn.Module):
-    def __init__(self, num_classes=3):
-        super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64*54*54, 128)  # adjust dims if needed
-        self.fc2 = nn.Linear(128, num_classes)
+    model = ChestXRayClassifier(input_shape, output_shape, hidden_units)
 
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = self.pool(torch.relu(self.conv2(x)))
-        x = torch.flatten(x, 1)
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+    # Safe load: works even if trained on GPU
+    state_dict = torch.load("model_3.pth", map_location=torch.device("cpu"))
+    model.load_state_dict(state_dict)
 
-# Load model weights
-model = SimpleCNN(num_classes=3)
-model.load_state_dict(torch.load("model_3.pth", map_location=device))
+    model.eval()
+    return model
 
-model.to(device)
-model.eval()
+model = load_model()
 
-# -------------------
-# Preprocessing
-# -------------------
-transform = transforms.Compose([
-    transforms.Resize((224,224)),
+# ----------------------------
+# Transforms
+# ----------------------------
+data_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
     transforms.ToTensor(),
 ])
 
-class_names = ["Normal", "Pneumonia", "COVID-19"]
+# ----------------------------
+# Class labels
+# ----------------------------
+CLASS_NAMES = ["Normal", "Pneumonia", "COVID-19"]
 
-# -------------------
-# Prediction Function
-# -------------------
-def predict(image):
-    image = transform(image).unsqueeze(0).to(device)  # (1,3,224,224)
+# ----------------------------
+# Prediction function
+# ----------------------------
+def predict(image: Image.Image):
+    image = data_transform(image).unsqueeze(0)  # add batch dimension
     with torch.no_grad():
         outputs = model(image)
         _, predicted = torch.max(outputs, 1)
-        return class_names[predicted.item()]
+    return CLASS_NAMES[predicted.item()]
 
-# -------------------
+# ----------------------------
 # Streamlit UI
-# -------------------
-st.title("🩻 Chest X-ray Classifier")
-st.write("Upload a chest X-ray to classify as **Normal**, **Pneumonia**, or **COVID-19**.")
+# ----------------------------
+st.title("🩻 Chest X-Ray Classifier")
+st.write("Upload a chest X-ray image, and the model will predict if it's **Normal**, **Pneumonia**, or **COVID-19**.")
 
-uploaded_file = st.file_uploader("Upload an image", type=["jpg","jpeg","png"])
+uploaded_file = st.file_uploader("📂 Upload an X-ray Image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded X-ray", use_column_width=True)
 
-    if st.button("Classify"):
-        label = predict(image)
-        st.success(f"Prediction: **{label}**")
+    if st.button("🔍 Predict"):
+        prediction = predict(image)
+        st.success(f"Prediction: **{prediction}**")
