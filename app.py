@@ -31,6 +31,7 @@ class SimpleCNN(nn.Module):
 # Load model weights
 model = SimpleCNN(num_classes=3)
 model.load_state_dict(torch.load("model_3.pth", map_location=device))
+
 model.to(device)
 model.eval()
 
