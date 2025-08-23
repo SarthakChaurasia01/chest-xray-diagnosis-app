@@ -16,7 +16,7 @@ def load_model():
     model = ChestXRayClassifier(input_shape, output_shape, hidden_units)
 
     # Safe load: works even if trained on GPU
-    state_dict = torch.load("model_3.pth", map_location=torch.device("cpu"))
+    state_dict = torch.load("model_2.pth", map_location=torch.device("cpu"))
     model.load_state_dict(state_dict)
 
     model.eval()
